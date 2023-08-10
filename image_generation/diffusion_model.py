@@ -1,3 +1,7 @@
+import sys
+import pathlib
+sys.path.append(str(pathlib.Path(__file__).parent.parent.resolve()))
+
 from diffusers import UNet2DModel, DDPMScheduler, DDPMPipeline
 from huggingface_hub import hf_hub_download, HfApi
 from helpers import get_random_string
