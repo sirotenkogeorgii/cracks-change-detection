@@ -108,23 +108,10 @@ class CDUnet(nn.Module):
             self._mid_level_features = feature_maps.copy()
 
         if second_prop:
-            feature_maps["layer5"] = torch.where(abs(feature_maps["layer5"] - self._mid_level_features["layer5"]) <= self.thresholds["threshold5"], \
-                                                    0, feature_maps["layer5"])
-
-            feature_maps["layer4"] = torch.where(abs(feature_maps["layer4"] - self._mid_level_features["layer4"]) <= self.thresholds["threshold4"], \
-                                                    0, feature_maps["layer4"])
-
-            feature_maps["layer3"] = torch.where(abs(feature_maps["layer3"] - self._mid_level_features["layer3"]) <= self.thresholds["threshold3"], \
-                                                    0, feature_maps["layer3"])
-
-            feature_maps["layer2"] = torch.where(abs(feature_maps["layer2"] - self._mid_level_features["layer2"]) <= self.thresholds["threshold2"], \
-                                                    0, feature_maps["layer2"])
-
-            feature_maps["layer1"] = torch.where(abs(feature_maps["layer1"] - self._mid_level_features["layer1"]) <= self.thresholds["threshold1"], \
-                                                    0, feature_maps["layer1"])
-
-            feature_maps["layer0"] = torch.where(abs(feature_maps["layer0"] - self._mid_level_features["layer0"]) <= self.thresholds["threshold0"], \
-                                                    0, feature_maps["layer0"])
+            for layer_num in range(len(self.thresholds)):
+                current_layer = f"layer{layer_num}"
+                feature_maps[current_layer] = torch.where(abs(feature_maps[current_layer] - self._mid_level_features[current_layer]) <= self.thresholds[f"threshold{layer_num}"], \
+                                                    0, feature_maps[current_layer])
 
         upsampled1 = self.upsample1(feature_maps["layer4"], feature_maps["layer5"])
         upsampled2 = self.upsample2(feature_maps["layer3"], upsampled1)
@@ -134,5 +121,13 @@ class CDUnet(nn.Module):
 
         prediction = self.conv3(upsampled5)
         return F.sigmoid(prediction)
-        
 
+
+if __name__ == "__main__":
+    model = CDUnet()
+
+    tensor1 = torch.randn([1, 3, 512, 512])
+    tensor2 = torch.randn([1, 3, 512, 512])
+
+    _ = model(tensor1)
+    diff_map = model(tensor2, second_prop=True)
