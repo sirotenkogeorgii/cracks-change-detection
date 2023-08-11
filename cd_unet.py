@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torchvision.models.feature_extraction import create_feature_extractor
 from typing import Optional, Callable
 
+
 class ConvBlock(nn.Module):
     def __init__(
         self, 
@@ -58,6 +59,7 @@ class UpSamplingBlock(nn.Module):
 class CDUnet(nn.Module):
     def __init__(
         self, 
+        out_channels: int,
         pretrained: bool = False,
         thresholds: dict[str, float] = None
     ) -> None:
@@ -96,7 +98,7 @@ class CDUnet(nn.Module):
         self.upsample4 = UpSamplingBlock(128, 24, 64)
         self.upsample5 = UpSamplingBlock(64, 3, 16)
 
-        self.conv3 = nn.Conv2d(in_channels=16, out_channels=3, kernel_size=1)
+        self.conv3 = nn.Conv2d(in_channels=16, out_channels=out_channels, kernel_size=1)
 
         self._mid_level_features = None
     
@@ -123,7 +125,7 @@ class CDUnet(nn.Module):
 
 
 if __name__ == "__main__":
-    model = CDUnet()
+    model = CDUnet(out_channels=1)
 
     tensor2 = torch.randn([1, 3, 512, 512])
     tensor1 = torch.randn([1, 3, 512, 512])
