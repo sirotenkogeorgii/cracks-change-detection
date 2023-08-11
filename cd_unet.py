@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import torch
 import torchvision
 import torch.nn as nn
@@ -97,7 +96,7 @@ class CDUnet(nn.Module):
         self.upsample4 = UpSamplingBlock(128, 24, 64)
         self.upsample5 = UpSamplingBlock(64, 3, 16)
 
-        self.conv3 = nn.Conv2d(in_channels=16, out_channels=1, kernel_size=1)
+        self.conv3 = nn.Conv2d(in_channels=16, out_channels=3, kernel_size=1)
 
         self._mid_level_features = None
     
@@ -126,8 +125,8 @@ class CDUnet(nn.Module):
 if __name__ == "__main__":
     model = CDUnet()
 
-    tensor1 = torch.randn([1, 3, 512, 512])
     tensor2 = torch.randn([1, 3, 512, 512])
+    tensor1 = torch.randn([1, 3, 512, 512])
 
     _ = model(tensor1)
     diff_map = model(tensor2, second_prop=True)
