@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import torch
+import numpy as np
 import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,7 +22,7 @@ class ConvBlock(nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         self.bn = nn.BatchNorm2d(out_channels)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv(x)
         x = self.bn(x)
         
@@ -46,7 +47,7 @@ class UpSamplingBlock(nn.Module):
         self.conv2 = conv_block(reduce_dim_to * 2, reduce_dim_to, 3, padding="same")
         self.conv3 = conv_block(reduce_dim_to, reduce_dim_to, 3, padding="same")
 
-    def forward(self, contract_path, x):
+    def forward(self, contract_path: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         contract_path = self.conv1(contract_path)
         x = self.upsample(x)
         concatenated = torch.cat([contract_path, x], dim=1)
@@ -103,7 +104,10 @@ class CDUnet(nn.Module):
         self._mid_level_features = None
     
 
-    def forward(self, x, second_prop=False):
+    def forward(self, x: torch.Tensor, second_prop: bool = False) -> torch.Tensor:
+        if isinstance(x, np.ndarray): x = torch.from_numpy(x).float()
+        if x.shape[1] == 1: x = x.expand(x.shape[0], 3, *x.shape[2:])
+
         feature_maps = self._backbone(x)
         if not second_prop:
             self._mid_level_features = feature_maps.copy()
