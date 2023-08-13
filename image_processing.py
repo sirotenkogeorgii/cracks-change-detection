@@ -6,11 +6,10 @@ import cv2
 import os
 from helpers import mean_squared_error
 
-def display_image(image: str | os.PathLike) -> None:
+def display_image(image: str | os.PathLike, gray: bool = True) -> None:
     _, ax = plt.subplots()
-    ax.imshow(image, 'gray')
+    ax.imshow(image, cmap = 'gray' if gray else None)
     ax.axis('off')
-    plt.show()
 
 def compare_affine_transformation(img1, img2, transformed):
     print(f"Before affine transformation: {mean_squared_error(img2, img1)}")
