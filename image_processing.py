@@ -6,12 +6,14 @@ import cv2
 import os
 from helpers import mean_squared_error
 
-def display_image(image: str | os.PathLike, gray: bool = True) -> None:
+
+def display_image(image: np.ndarray, gray: bool = True) -> None:
     _, ax = plt.subplots()
     ax.imshow(image, cmap = 'gray' if gray else None)
     ax.axis('off')
 
-def compare_affine_transformation(img1, img2, transformed):
+
+def compare_affine_transformation(img1: np.ndarray, img2: np.ndarray, transformed: np.ndarray) -> None:
     print(f"Before affine transformation: {mean_squared_error(img2, img1)}")
     print(f"After affine transformation: {mean_squared_error(img2, transformed)}")
     print(f"After affine transformation and crop: {mean_squared_error(crop_borders(transformed, 10), crop_borders(img2, 10))}")
@@ -103,26 +105,27 @@ def _find_transformation(
     return best_transformation
 
 
-def histogram_equalizing(image1: np.ndarray, image2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    matching, before_img_ind = _histogram_equalizing(image1, image2)
+def histogram_equalizing(image1: np.ndarray, image2: np.ndarray, grayscale: bool = False) -> tuple[np.ndarray, np.ndarray]:
+    matching, before_img_ind = _histogram_equalizing(image1, image2, grayscale)
     before_after_image = (2, 1) if before_img_ind == 0 else (1, 2)
 
     return matching[before_after_image[0]], matching[before_after_image[1]]
 
 
-def _histogram_equalizing(image1: np.ndarray, image2: np.ndarray):
+def _histogram_equalizing(image1: np.ndarray, image2: np.ndarray, grayscale: bool):
     before_radiation = 0
     if np.mean(image1) > np.mean(image2):
         image1, image2 = image2, image1
         before_radiation = 1
 
-    return _histogram_matching(image1, image2), before_radiation
+    return _histogram_matching(image1, image2, grayscale), before_radiation
 
 
-def _histogram_matching(image: np.ndarray, reference: np.ndarray):
-    matched = match_histograms(image, reference, channel_axis=-1)
+def _histogram_matching(input_image: np.ndarray, reference: np.ndarray, grayscale: bool):
+    print(input_image.shape, reference.shape)
+    matched = match_histograms(input_image, reference, channel_axis = None if grayscale else -1)
 
-    return image, reference, matched
+    return input_image, reference, matched
 
 
 def mutual_information(hgram):
