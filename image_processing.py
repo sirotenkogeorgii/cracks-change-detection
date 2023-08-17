@@ -2,12 +2,15 @@ from skimage.exposure import match_histograms
 from matplotlib import pyplot as plt
 from typing import Callable
 import numpy as np
+import torch
 import cv2
 import os
 from helpers import mean_squared_error
 
 
 def display_image(image: np.ndarray, gray: bool = True) -> None:
+    if isinstance(image, torch.Tensor) and image.requires_grad:
+        image = image.detach()
     _, ax = plt.subplots()
     ax.imshow(image, cmap = 'gray' if gray else None)
     ax.axis('off')
