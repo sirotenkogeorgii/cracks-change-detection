@@ -32,10 +32,9 @@ def affine_transformation(
     display_keypoints: bool = False
     ) -> np.ndarray:
 
-
     detector_extractor = detector()
-    keypoints1, descriptors1 = detector_extractor.detectAndCompute(image1, None)
-    keypoints2, descriptors2 = detector_extractor.detectAndCompute(image2, None)
+    keypoints1, descriptors1 = detector_extractor.detectAndCompute(image1.astype(np.uint8), None)
+    keypoints2, descriptors2 = detector_extractor.detectAndCompute(image2.astype(np.uint8), None)
 
     matches = matcher().knnMatch(descriptors1, descriptors2, k=knn_neighbors)
     best_matches = []
@@ -122,8 +121,7 @@ def _histogram_equalizing(image1: np.ndarray, image2: np.ndarray, grayscale: boo
 
 
 def _histogram_matching(input_image: np.ndarray, reference: np.ndarray, grayscale: bool):
-    print(input_image.shape, reference.shape)
-    matched = match_histograms(input_image, reference, channel_axis = None if grayscale else -1)
+    matched = match_histograms(input_image.astype(np.int64), reference.astype(np.int64), channel_axis = None if grayscale else -1)
 
     return input_image, reference, matched
 
