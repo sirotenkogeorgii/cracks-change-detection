@@ -10,7 +10,7 @@ def thresholding(image, threshold: float = 0.5) -> np.ndarray:
     return torch.where(torch.Tensor(image) < threshold, 0, 1).numpy()
 
 
-def MedianFilter(inputImage: np.ndarray, ksize: int = 7) -> np.ndarray:
+def median_filter(inputImage: np.ndarray, ksize: int = 7) -> np.ndarray:
     medBlurred = cv2.medianBlur(inputImage.astype(np.uint8), ksize) 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7,7))
     return  cv2.morphologyEx(medBlurred, cv2.MORPH_CLOSE, kernel, iterations=2)
@@ -18,7 +18,7 @@ def MedianFilter(inputImage: np.ndarray, ksize: int = 7) -> np.ndarray:
 
 
 def make_mask(image: np.ndarray, threshold: float, ksize: int) -> np.ndarray:
-    return thresholding(MedianFilter((image * 255), ksize), threshold)
+    return thresholding(median_filter((image * 255), ksize), threshold)
 
 
 def remove_holes_objects(mask):
