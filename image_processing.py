@@ -131,11 +131,10 @@ def mutual_information(hgram):
 
 def crop_patches(image: np.ndarray, patch_size: int, stride: int = 512) -> list[np.ndarray]:    
     patches = []
-    # rows
-    for i in range((image.shape[0]  - patch_size) // stride + 1):
-        # columns
-        for j in range((image.shape[1]  - patch_size) // stride + 1):
-            current_patch = image[i * (patch_size // stride): (i + 1) * patch_size, j * (patch_size // stride): (j + 1) * patch_size]
+    
+    for i in range((image.shape[0]  - patch_size) // stride + 1): # rows
+        for j in range((image.shape[1]  - patch_size) // stride + 1): # columns
+            current_patch = image[i * stride: patch_size + i * stride, j * stride: patch_size + j * stride]
             patches.append(current_patch)
             
     return patches
@@ -150,3 +149,28 @@ def filter_patches(patches: list[np.ndarray], mask: np.ndarray) -> list[np.ndarr
     new_patches = [patch for i, patch in enumerate(patches) if mask[i] == 1]
     
     return new_patches
+
+
+def perform_overlap_mean(sum_map, overlap_px):
+    sum_map[overlap_px: -overlap_px, overlap_px: -overlap_px] /= 4 # center part
+    sum_map[overlap_px: -overlap_px, :overlap_px] /= 2 # left part
+    sum_map[overlap_px: -overlap_px, -overlap_px:] /= 2 # right part
+    sum_map[:overlap_px, overlap_px: -overlap_px] /= 2 # upper part
+    sum_map[-overlap_px:, overlap_px: -overlap_px] /= 2 # lower part
+    return sum_map
+
+def create_sum_map(map_shape, overlap_px, patches):
+    sum_map = np.zeros(map_shape)
+    patch_size = patches[0].shape[0]
+
+    patch_counter = 0
+    for i in range((map_shape[0]  - patch_size) // overlap_px + 1): # rows
+        for j in range((map_shape[1]  - patch_size) // overlap_px + 1): # columns
+            sum_map[i * overlap_px: patch_size + i * overlap_px, j * overlap_px: patch_size + j * overlap_px] += patches[patch_counter]
+            patch_counter += 1
+        
+    return sum_map
+
+def overlap_patches(map_shape, overlap_px, patches):
+    sum_map = create_sum_map(map_shape, overlap_px, patches)
+    return perform_overlap_mean(sum_map, overlap_px)
