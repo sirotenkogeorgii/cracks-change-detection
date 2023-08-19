@@ -13,6 +13,7 @@ import os
 # TODO: Make images to device
 # TODO: Make inference with overlapping
 # TODO: Debug arguments for console
+# TODO: Tune thresholds for unet
 
 # python3 defects_detection.py --input=examples/example_data/images/10_bez_crop.jpg --ref=examples/example_data/images/10_1_crop.jpg --diff --with_corners --grayscale
 parser = argparse.ArgumentParser()
@@ -74,7 +75,7 @@ def main(args: argparse.Namespace) -> None:
         Image.fromarray((reconstructed_image * 255).astype(np.uint8)).save(f"{args.target_dir}/change_detection.png")      
 
     else:
-        for i, result_patch in result_patches:
+        for i, result_patch in enumerate(result_patches):
             if args.colored: result_patch = plt.get_cmap('viridis')(result_patch)[:, :, :3]
             Image.fromarray((result_patch * 255).astype(np.uint8)).save(f"{args.target_dir}/{i}.png")      
 
