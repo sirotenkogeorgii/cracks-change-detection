@@ -2,18 +2,8 @@ from skimage.exposure import match_histograms
 from matplotlib import pyplot as plt
 from typing import Callable
 import numpy as np
-import torch
 import cv2
-import os
-from helpers import mean_squared_error
-
-
-def display_image(image: np.ndarray, gray: bool = True) -> None:
-    if isinstance(image, torch.Tensor) and image.requires_grad:
-        image = image.detach()
-    _, ax = plt.subplots()
-    ax.imshow(image, cmap = 'gray' if gray else None)
-    ax.axis('off')
+from metrics import mean_squared_error
 
 
 def compare_affine_transformation(img1: np.ndarray, img2: np.ndarray, transformed: np.ndarray) -> None:
@@ -139,16 +129,15 @@ def mutual_information(hgram):
     return np.sum(pxy[nzs] * np.log(pxy[nzs] / px_py[nzs]))
 
 
-def crop_patches(image: np.ndarray, patch_size: int) -> list[np.ndarray]:
-    if image.shape[0] % patch_size != 0 or image.shape[1] % patch_size != 0:
-        raise Exception(f"The size of the image must be divisible without remainder by the size of the patch. Image size: {image.shape}. Patch size: {patch_size}.")
-    
+def crop_patches(image: np.ndarray, patch_size: int, stride: int = 512) -> list[np.ndarray]:    
     patches = []
-    for i in range(image.shape[0] // patch_size):
-        for j in range(image.shape[1] // patch_size):
-            current_patch = image[i * patch_size: (i + 1) * patch_size, j * patch_size: (j + 1) * patch_size]
+    # rows
+    for i in range((image.shape[0]  - patch_size) // stride + 1):
+        # columns
+        for j in range((image.shape[1]  - patch_size) // stride + 1):
+            current_patch = image[i * (patch_size // stride): (i + 1) * patch_size, j * (patch_size // stride): (j + 1) * patch_size]
             patches.append(current_patch)
-
+            
     return patches
 
 
