@@ -20,7 +20,6 @@ parser.add_argument("--input", type=str, help="Images path.", required=True)
 parser.add_argument("--ref", type=str, help="Masks path.", required=True)
 parser.add_argument("--target_dir", default="./defects_output", type=str, help="Directory to save the results.")
 parser.add_argument("--model_path", default="./weights/segmentation/model_weights_60_norm.pth", type=str, help="Model path.")
-parser.add_argument("--grayscale", action="store_true", help="Consider the image as grayscale.")
 parser.add_argument("--by_patches", action="store_true", help="Return patches.")
 parser.add_argument("--diff", action="store_true", help="Perform difference of predictions.")
 parser.add_argument("--with_corners", action="store_true", help="Process corners of images.")
@@ -32,10 +31,10 @@ def main(args: argparse.Namespace) -> None:
     cpu = "mps" if torch.backends.mps.is_available() else "cpu"
     device = torch.device("cuda" if torch.cuda.is_available() else cpu)
 
-    input1 = cv2.imread(args.input, flags = cv2.IMREAD_GRAYSCALE if  args.grayscale else cv2.IMREAD_UNCHANGED)
-    input2 = cv2.imread(args.ref, flags = cv2.IMREAD_GRAYSCALE if args.grayscale else cv2.IMREAD_UNCHANGED)
+    input1 = cv2.imread(args.input, flags = cv2.IMREAD_GRAYSCALE)
+    input2 = cv2.imread(args.ref, flags = cv2.IMREAD_GRAYSCALE)
 
-    input1, input2 = histogram_equalizing(input1, input2, grayscale = args.grayscale == True)
+    input1, input2 = histogram_equalizing(input1, input2, grayscale=True)
     resized1 = cv2.resize(input1, (512 * 5, 512 * 5), interpolation=cv2.INTER_AREA)
     resized2 = cv2.resize(input2, (512 * 5, 512 * 5), interpolation=cv2.INTER_AREA)
     resized1 = affine_transformation(resized1, resized2, knn_neighbors=10, display_keypoints=False)
@@ -46,7 +45,7 @@ def main(args: argparse.Namespace) -> None:
 
     patches1 = filter_patches(crop_patches(resized1, 512), mask) 
     patches2 = filter_patches(crop_patches(resized2, 512), mask) 
-    equalized_patch_pairs = [histogram_equalizing(patch1, patch2, grayscale = args.grayscale == True) for patch1, patch2 in zip(patches1, patches2)]
+    equalized_patch_pairs = [histogram_equalizing(patch1, patch2, grayscale=True) for patch1, patch2 in zip(patches1, patches2)]
 
     model = CDUnet(out_channels=1).to(device)
     model = torch.load(args.model_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
@@ -58,9 +57,9 @@ def main(args: argparse.Namespace) -> None:
         result_patches = [abs(img1 - img2) for img1, img2 in zip(images_preds1, images_preds2)]
 
     else:
-        for patch1, patch2 in zip(equalized_patch_pairs):
-            _ = model(patch1)
-            result_patches.append(model(patch2, second_prop=True).detach().numpy())
+        for patch1, patch2 in equalized_patch_pairs:
+            _ = model(patch1[None, None, ...])
+            result_patches.append(model(patch2[None, None, ...], second_prop=True)[0][0].detach().numpy())
 
     os.makedirs(args.target_dir, exist_ok=True)
 
