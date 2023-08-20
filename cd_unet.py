@@ -103,6 +103,8 @@ class CDUnet(nn.Module):
 
         self._mid_level_features = None
     
+    def set_thresholds(self, thresholds: dict) -> None:
+        self.thresholds = thresholds
 
     def forward(self, x: torch.Tensor, second_prop: bool = False) -> torch.Tensor:
         if isinstance(x, np.ndarray): x = torch.from_numpy(x).float()
