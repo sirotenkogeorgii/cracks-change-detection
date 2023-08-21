@@ -113,6 +113,7 @@ class UNetDiffusion:
         repo_id: str = None,
         commit_message: str = None,
         is_pretrained_pipeline: bool = False, 
+        seed: int = None
         ) -> None:
 
         accelerator = Accelerator(
@@ -126,7 +127,8 @@ class UNetDiffusion:
         if is_pretrained_pipeline:
             pipeline = pipeline.from_pretrained(CONFIG.pretrained_dir, from_tf=True)
 
-        generated_images = pipeline(batch_size=samples_num, generator=torch.manual_seed(CONFIG.seed)).images
+        if seed is None: seed = CONFIG.seed
+        generated_images = pipeline(batch_size=samples_num, generator=torch.manual_seed(seed)).images
         self._save_images(generated_images, repo_id, commit_message)   
 
     def get_model(self): return self._model
