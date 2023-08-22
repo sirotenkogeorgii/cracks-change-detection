@@ -151,7 +151,7 @@ def main(args: argparse.Namespace) -> None:
     elif args.loss == "combined": criterion = dice_bce_loss
     else: raise ValueError("Unsupported loss '{}'".format(args.loss))
 
-    if args.ohem: criterion = OHEM(loss_function=criterion)
+    if args.ohem: criterion = OHEM(criterion, 0.7)
 
     epochs = 0
     model = CDUnet(out_channels=1, pretrained=args.pretrained).to(device)
@@ -160,7 +160,7 @@ def main(args: argparse.Namespace) -> None:
         else: model.unfreeze_backbone()
         optimizer = torch.optim.NAdam(model.parameters(), lr=stage_lr)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, stage_epochs * len(loader))
-        fit(stage_epochs, model, scheduler, optimizer, criterion, loader, test_dataset, IoUMetric, device, epochs + stage_epochs)
+        fit(stage_epochs, model, scheduler, optimizer, criterion, loader, test_dataset, IoUMetric, device, epochs)
         epochs += stage_epochs
 
     torch.save(model, args.model_path)
