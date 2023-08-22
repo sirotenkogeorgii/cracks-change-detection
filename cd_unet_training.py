@@ -151,6 +151,8 @@ def main(args: argparse.Namespace) -> None:
     elif args.loss == "combined": criterion = dice_bce_loss
     else: raise ValueError("Unsupported loss '{}'".format(args.loss))
 
+    if args.ohem: criterion = OHEM(loss_function=criterion)
+
     epochs = 0
     model = CDUnet(out_channels=1, pretrained=args.pretrained).to(device)
     for mode, stage_epochs, stage_lr in args.epochs:
