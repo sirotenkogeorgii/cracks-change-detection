@@ -12,6 +12,23 @@ def display_image(image: np.ndarray, gray: bool = True) -> None:
     ax.imshow(image, cmap = 'gray' if gray else None)
     ax.axis('off')
 
+def augmentation_wrapper(augmentation, parameter = None):
+    def augmentation_wrapped(image):
+        return augmentation(image) if parameter is None else augmentation(image, parameter)
+    return augmentation_wrapped
+
+def init_logger(log_file='./train.log'):
+    from logging import getLogger, INFO, FileHandler,  Formatter,  StreamHandler
+    logger = getLogger(__name__)
+    logger.setLevel(INFO)
+    handler1 = StreamHandler()
+    handler1.setFormatter(Formatter("%(message)s"))
+    handler2 = FileHandler(filename=log_file)
+    handler2.setFormatter(Formatter("%(message)s"))
+    logger.addHandler(handler1)
+    logger.addHandler(handler2)
+    return logger
+
 
 def get_random_string(length: int) -> str:
     letters = string.ascii_lowercase
