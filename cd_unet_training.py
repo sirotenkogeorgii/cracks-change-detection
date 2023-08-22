@@ -15,7 +15,7 @@ from cd_unet import CDUnet, UpSamplingBlock, ConvBlock
 from loss_funstions import OHEM, dice_bce_loss, dice_loss
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_path", default="", type=str, help="Path to save the trained model.", required=True)
+parser.add_argument("--model_path", default="model.pth", type=str, help="Path to save the trained model.")
 parser.add_argument("--data_path", default="/kaggle/input/concrete-cells-s/concrete_cells_s/annotated/images", type=str, help="Path to the data directory.")
 parser.add_argument("--labels_path", default="/kaggle/input/concrete-cells-s/concrete_cells_s/annotated/label/aggregate", type=str, help="Path to the labels directory.")
 parser.add_argument("--logs_path", default="./train.log", type=str, help="Path to the save logs.")
@@ -67,6 +67,7 @@ class SegmentationDataset(Dataset):
 
 def main(args: argparse.Namespace) -> None:
     torch.manual_seed(args.seed)
+    LOGGER = init_logger(args.logs_path)
     args.epochs = [(mode, int(epochs), float(lr)) for epoch in args.epochs.split(",") for mode, epochs, lr in [epoch.split(":")]]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -90,7 +91,8 @@ def main(args: argparse.Namespace) -> None:
                 batches_num += 1
                 bar.set_postfix(ordered_dict={"train_loss":loss.item()})
             if scheduler is not None: scheduler.step()
-            print("Epoch: {0:}. Loss: {1:.2f}. Train IoU: {2:.2f}. Test IoU: {3:.2f}".format(init_epoch + epoch + 1, train_loss, iou_score / batches_num, evaluate(model, test_dataset, metric, device)))
+            message = "Epoch: {0:}. Loss: {1:.2f}. Train IoU: {2:.2f}. Test IoU: {3:.2f}".format(init_epoch + epoch + 1, train_loss, iou_score / batches_num, evaluate(model, test_dataset, metric, device))
+            LOGGER.info(message)
 
     def augment_image(image: torch.Tensor, probability: float = 0.5) -> torch.Tensor:
         if random.random() <= probability: image = TF.adjust_contrast(image, random.uniform(-2, 2))
@@ -130,8 +132,8 @@ def main(args: argparse.Namespace) -> None:
     images = sorted(os.listdir(args.data_path))
     masks = sorted(os.listdir(args.labels_path))
     for image_ind, mask_ind in zip(images, masks):
-        data.extend(crop_patches(get_image(args.data_path, image_ind), 512, 256))
-        labels.extend(crop_patches(get_image(args.labels_path, mask_ind), 512, 256))
+        data.extend(crop_patches(get_image(args.data_path, image_ind), 512, 256 if args.overlap else 512))
+        labels.extend(crop_patches(get_image(args.labels_path, mask_ind), 512, 256 if args.overlap else 512))
 
     def evaluate(model, dataset, metric, device):
         return torch.mean(torch.Tensor([metric(model(image.to(device)[None, ...]), target.to(device)) for image, target in dataset]))
@@ -163,5 +165,5 @@ def main(args: argparse.Namespace) -> None:
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
+    args = parser.parse_args([] if "__file__" not in globals() else None)
     main(args)
