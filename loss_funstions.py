@@ -1,7 +1,8 @@
 import torch
 
 class OHEM(torch.nn.Module):                                                                                                                                                                             
-    def __init__(self, loss_function = torch.nn.functional.binary_cross_entropy, ratio: float = 2/3, ) -> None:                                      
+    def __init__(self, loss_function = torch.nn.functional.binary_cross_entropy, ratio: float = 2/3, ) -> None:     
+        super(OHEM, self).__init__()                                 
         self.loss_function = loss_function
         self.ratio = ratio                                                                                                                                
     def forward(self, preds: torch.Tensor, targets: torch.Tensor, ratio: float = None) -> torch.Tensor:                                           
