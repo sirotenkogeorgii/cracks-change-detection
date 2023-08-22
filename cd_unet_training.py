@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
-import cv2
 import os
-import argparse
+import cv2
 import torch
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-from tqdm.auto import tqdm as tq
-from cd_unet import CDUnet, UpSamplingBlock, ConvBlock
-import torchvision.transforms.functional as TF
-from metrics import IoUMetric
 import random
-from loss_funstions import OHEM, dice_bce_loss, dice_loss
+import argparse
+import numpy as np
+from metrics import IoUMetric
+from helpers import init_logger
+from tqdm.auto import tqdm as tq
 from image_processing import crop_patches
-
+import torchvision.transforms.functional as TF
+from torch.utils.data import Dataset, DataLoader
+from cd_unet import CDUnet, UpSamplingBlock, ConvBlock
+from loss_funstions import OHEM, dice_bce_loss, dice_loss
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path", default="", type=str, help="Path to save the trained model.", required=True)
 parser.add_argument("--data_path", default="/kaggle/input/concrete-cells-s/concrete_cells_s/annotated/images", type=str, help="Path to the data directory.")
 parser.add_argument("--labels_path", default="/kaggle/input/concrete-cells-s/concrete_cells_s/annotated/label/aggregate", type=str, help="Path to the labels directory.")
+parser.add_argument("--logs_path", default="./train.log", type=str, help="Path to the save logs.")
 parser.add_argument("--pretrained", action="store_true", help="Use pretrained backbone.")
 parser.add_argument("--normalize", action="store_true", help="Normalize data.")
 parser.add_argument("--image_augs", action="store_true", help="Augment images.")
