@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import cv2
 import os
+import argparse
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
@@ -9,11 +10,25 @@ from cd_unet import CDUnet, UpSamplingBlock, ConvBlock
 import torchvision.transforms.functional as TF
 from metrics import IoUMetric
 import random
+from loss_funstions import OHEM, dice_bce_loss, dice_loss
+from image_processing import crop_patches
 
-# TODO: Clean code
-# TODO: Finish code
-# TODO: Add arguments
-# TODO: Add ensembling
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_path", default="", type=str, help="Path to save the trained model.", required=True)
+parser.add_argument("--data_path", default="/kaggle/input/concrete-cells-s/concrete_cells_s/annotated/images", type=str, help="Path to the data directory.")
+parser.add_argument("--labels_path", default="/kaggle/input/concrete-cells-s/concrete_cells_s/annotated/label/aggregate", type=str, help="Path to the labels directory.")
+parser.add_argument("--pretrained", action="store_true", help="Use pretrained backbone.")
+parser.add_argument("--normalize", action="store_true", help="Normalize data.")
+parser.add_argument("--image_augs", action="store_true", help="Augment images.")
+parser.add_argument("--overlap", action="store_true", help="Crop patches with overlapping.")
+parser.add_argument("--augmentations", action="store_true", help="Apply augmentations of masks and images.")
+parser.add_argument("--ohem", action="store_true", help="Use online hard example mining.")
+parser.add_argument("--loss", default="bce", choices=["bce", "dice", "combined"], help="Loss type.")
+parser.add_argument("--test_proportion", default=0.1, type=float, help="Proportion of the test data.")
+parser.add_argument("--epochs", default="frozen:10:1e-3,finetune:20:1e-4", type=str, help="Training epochs.")
+parser.add_argument("--batch_size", default=8, type=int, help="Batch size.")
+parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 
 
 class SegmentationDataset(Dataset):
@@ -49,25 +64,14 @@ class SegmentationDataset(Dataset):
         return image, mask
 
 
-def main() -> None:
-    # torch.manual_seed(42)
-    # args = parser.parse_args()
+def main(args: argparse.Namespace) -> None:
+    torch.manual_seed(args.seed)
+    args.epochs = [(mode, int(epochs), float(lr)) for epoch in args.epochs.split(",") for mode, epochs, lr in [epoch.split(":")]]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps")
-    def augment_image(image: torch.Tensor, probability: float = 0.5) -> torch.Tensor:
-        if random.random() <= probability: image = TF.adjust_contrast(image, random.uniform(-2, 2))
-        if random.random() <= probability: image = TF.adjust_brightness(image, random.uniform(0.3, 1))  
-        if random.random() <= probability: image = TF.adjust_sharpness(image, random.randint(2, 10))  
-        if random.random() <= probability: image = TF.adjust_hue(image, random.uniform(-0.5, 0.5))    
-        if random.random() <= probability: image = TF.gaussian_blur(image, [3,5,7,9][random.randint(0, 3)]) 
-        return image
-
-    def fit(epochs, model, scheduler, optimizer, train_loader, test_dataset, metric, device) -> None:
+    def fit(epochs, model, scheduler, optimizer, criterion, train_loader, test_dataset, metric, device, init_epoch) -> None:
         model.train()
-        criterion = torch.nn.BCELoss() # BCE_OHEM(0.7)
-        scheduler = scheduler
         for epoch in range(epochs):
-
             train_loss = 0.0
             iou_score = 0.0
 
@@ -76,9 +80,7 @@ def main() -> None:
             for data, target in bar:
                 data, target = data.to(device), target.to(device)
                 optimizer.zero_grad()
-
                 output = model(data)
-
                 loss = criterion(output, target)
                 loss.backward()
                 optimizer.step()
@@ -86,9 +88,16 @@ def main() -> None:
                 iou_score += metric(output, target)
                 batches_num += 1
                 bar.set_postfix(ordered_dict={"train_loss":loss.item()})
-                
             if scheduler is not None: scheduler.step()
-            print("Epoch: {0:}. Loss: {1:.2f}. Train IoU: {2:.2f}. Test IoU: {3:.2f}".format(epoch + 1, train_loss, iou_score / batches_num, evaluate(model, test_dataset, metric, device)))
+            print("Epoch: {0:}. Loss: {1:.2f}. Train IoU: {2:.2f}. Test IoU: {3:.2f}".format(init_epoch + epoch + 1, train_loss, iou_score / batches_num, evaluate(model, test_dataset, metric, device)))
+
+    def augment_image(image: torch.Tensor, probability: float = 0.5) -> torch.Tensor:
+        if random.random() <= probability: image = TF.adjust_contrast(image, random.uniform(-2, 2))
+        if random.random() <= probability: image = TF.adjust_brightness(image, random.uniform(0.3, 1))  
+        if random.random() <= probability: image = TF.adjust_sharpness(image, random.randint(2, 10))  
+        if random.random() <= probability: image = TF.adjust_hue(image, random.uniform(-0.5, 0.5))    
+        if random.random() <= probability: image = TF.gaussian_blur(image, [3,5,7,9][random.randint(0, 3)]) 
+        return image
 
     def augment_image_mask(
         image: torch.Tensor,
@@ -111,60 +120,47 @@ def main() -> None:
         if image_transform: image = augment_image(image)
         return image, mask
 
-    def make512patches(image: np.ndarray, size: int) -> list[np.ndarray]:
-        patches = []
-        for i in range(1, (image.shape[0] // size) + 1):
-            for j in range(1, (image.shape[1] // size) + 1):
-                patches.append(image[size * (i - 1): size * i, size * (j - 1): size * j])
-        return patches
-
     def get_image(filepath: str, image_ind: int | str) -> np.ndarray:
         filepath = f"{filepath}/{image_ind}"
         return cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
 
-    DATA = "/kaggle/input/concrete-cells-s/concrete_cells_s/annotated/images"
-    LABELS = "/kaggle/input/concrete-cells-s/concrete_cells_s/annotated/label/aggregate"
-
-    images = sorted(os.listdir(DATA))
-    masks = sorted(os.listdir(LABELS))
-    print(len(images), len(masks))
-
-    # NOTE: try to resize images to make them more density, and after that crop to patches
     data = []
     labels = []
+    images = sorted(os.listdir(args.data_path))
+    masks = sorted(os.listdir(args.labels_path))
     for image_ind, mask_ind in zip(images, masks):
-        print(image_ind, mask_ind)
-        data.extend(make512patches(get_image(DATA, image_ind), 512))
-        labels.extend(make512patches(get_image(LABELS, mask_ind), 512))
+        data.extend(crop_patches(get_image(args.data_path, image_ind), 512, 256))
+        labels.extend(crop_patches(get_image(args.labels_path, mask_ind), 512, 256))
 
     def evaluate(model, dataset, metric, device):
         return torch.mean(torch.Tensor([metric(model(image.to(device)[None, ...]), target.to(device)) for image, target in dataset]))
 
-    train_images, test_images = data[:-25], data[-25:]
-    train_labels, test_labels = labels[:-25], labels[-25:]
-    # train_dataset = SegmentationDataset(train_images, train_labels, None, image_transform=False, normalize=False)
-    train_dataset = SegmentationDataset(train_images, train_labels, augment_image_mask, image_transform=False, normalize=True)
-    test_dataset = SegmentationDataset(test_images, test_labels, None, image_transform=False, normalize=False)
-    loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
+    test_size = int(len(data) * args.test_proportion)
+    train_images, test_images = data[:-test_size], data[-test_size:]
+    train_labels, test_labels = labels[:-test_size], labels[-test_size:]
+    train_dataset = SegmentationDataset(train_images, train_labels, augment_image_mask if args.augmentations else None, image_transform=args.image_augs, normalize=args.normalize)
+    test_dataset = SegmentationDataset(test_images, test_labels, None, image_transform=False, normalize=args.normalize)
+    loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
-    model = CDUnet(out_channels=1, pretrained=True).to(device)
-    init_lr = 0.0001
+    criterion = None
+    if args.loss == "bce": criterion = torch.nn.functional.binary_cross_entropy
+    elif args.loss == "dice": criterion = dice_loss
+    elif args.loss == "combined": criterion = dice_bce_loss
+    else: raise ValueError("Unsupported loss '{}'".format(args.loss))
 
-    freeze_epochs = 30
-    unfreeze_epochs = 70
+    epochs = 0
+    model = CDUnet(out_channels=1, pretrained=args.pretrained).to(device)
+    for mode, stage_epochs, stage_lr in args.epochs:
+        if mode.startswith("frozen"): model.freeze_backbone()
+        else: model.unfreeze_backbone()
+        optimizer = torch.optim.NAdam(model.parameters(), lr=stage_lr)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, stage_epochs * len(loader))
+        fit(stage_epochs, model, scheduler, optimizer, criterion, loader, test_dataset, IoUMetric, device, epochs + stage_epochs)
+        epochs += stage_epochs
 
+    torch.save(model, args.model_path)
 
-    model.freeze_backbone()
-    optimizer = torch.optim.NAdam(model.parameters(), lr=init_lr)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, freeze_epochs * len(loader))
-    fit(freeze_epochs, model, scheduler, optimizer, loader, test_dataset, IoUMetric, device)
-
-    model.unfreeze_backbone()
-    optimizer = torch.optim.NAdam(model.parameters(), lr=init_lr)#lr=init_lr/10)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, unfreeze_epochs * len(loader))
-    fit(unfreeze_epochs, model, scheduler, optimizer, loader, test_dataset, IoUMetric, device)
-
-    torch.save(model, "/kaggle/working/model_weights_60_eff_norm.pth")
 
 if __name__ == "__main__":
-    main()
+    args = parser.parse_args()
+    main(args)
