@@ -106,6 +106,14 @@ class CDUnet(nn.Module):
     def set_thresholds(self, thresholds: dict) -> None:
         self.thresholds = thresholds
 
+    def freeze_backbone(self) -> None:
+        for param in self._backbone.parameters():
+            param.requires_grad = False
+            
+    def unfreeze_backbone(self) -> None:
+        for param in self._backbone.parameters():
+            param.requires_grad = True
+            
     def forward(self, x: torch.Tensor, second_prop: bool = False) -> torch.Tensor:
         if isinstance(x, np.ndarray): x = torch.from_numpy(x).float()
         if x.shape[1] == 1: x = x.expand(x.shape[0], 3, *x.shape[2:])
