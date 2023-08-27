@@ -42,7 +42,7 @@ class UnetEnsemble(torch.nn.Module):
     def _process_image(self, image, augmentation = None, normalize: bool = False):
         image = TF.to_pil_image(image.astype(np.uint8) if isinstance(image, np.ndarray) else image.type(torch.uint8))
         if augmentation is not None: image = augmentation(image)
-        image = TF.to_tensor(image)
+        image = TF.to_tensor(image).to(self.device)
         if normalize: image = TF.normalize(image, mean=0.485, std=0.229)
 
         return image
