@@ -28,7 +28,9 @@ def main(args: argparse.Namespace) -> None:
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
+    # models_path = ["weights/masking/model_10.pth"]
     models_path = "weights/masking"
+
     augmentations = [(augmentation_wrapper(TF.vflip), True), (augmentation_wrapper(TF.hflip), True)]
 
     model = UnetEnsemble(models_path, device, tta_mode=True, ttas=augmentations).to(device)
@@ -36,12 +38,12 @@ def main(args: argparse.Namespace) -> None:
     os.makedirs(args.masks_path, exist_ok=True)
     for filename in os.listdir(args.images_path):
         image = cv2.imread(f"{args.images_path}/{filename}", cv2.IMREAD_GRAYSCALE)
-        model_output = model(image, normalize=True).detach().numpy()
+        model_output = model(image, normalize=True).detach().cpu().numpy()
 
-        mask = make_mask(model_output, args.threshold, args.ellipse_size)#torch.where(torch.Tensor(model_output) < args.threshold, 0, 1).numpy().astype(np.uint8) * 255
-        mask = remove_holes_objects(mask)
+        # mask = make_mask(model_output, args.threshold, args.ellipse_size)
+        # mask = remove_holes_objects(mask)
+        mask = (model_output * 255).astype(np.uint8)
         
-        # mask = remove_holes_objects((model_output * 255).astype(np.uint8))
         Image.fromarray(mask).save(f"{args.masks_path}/mask_{filename}")
 
 if __name__ == "__main__":
