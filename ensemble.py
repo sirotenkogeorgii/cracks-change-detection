@@ -48,7 +48,7 @@ class UnetEnsemble(torch.nn.Module):
         return image
 
     def _tta_inference(self, model, image, normalize):
-        image_predictions = [model(image[None, None, ...])[0][0]]
+        image_predictions = [model(self._process_image(image, None, normalize)[None, ...])[0][0]]
         for augmentation, invert in self.ttas:
             augmented_image = self._process_image(image, augmentation, normalize)
             image_prediction = model(augmented_image[None, ...].to(self.device))[0][0]
