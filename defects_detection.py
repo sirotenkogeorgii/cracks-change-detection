@@ -8,8 +8,11 @@ from PIL import Image
 import numpy as np
 import argparse
 import torch
+import sys
 import cv2
 import os
+
+CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 # python3 defects_detection.py --input=/Users/georgiisirotenko/Downloads/2_bez_popisu_crop.jpg --ref=/Users/georgiisirotenko/Downloads/2_2_crop.jpg --colored --diff
 # python3 defects_detection.py --input=examples/example_data/images/10_bez_crop.jpg --ref=examples/example_data/images/10_1_crop.jpg --diff --grayscale
@@ -27,6 +30,7 @@ parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 
 
 def main(args: argparse.Namespace) -> None:
+    print(CURRENT_DIR)
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -51,7 +55,7 @@ def main(args: argparse.Namespace) -> None:
         overlapped_patches = overlap_patches([2560, 2560], 256, patches)
         return crop_patches(overlapped_patches, 512, 512)
 
-    model = torch.load(args.model_path, map_location=device).to(device)
+    model = torch.load(f"{CURRENT_DIR}/{args.model_path}", map_location=device).to(device)
     # model.eval() # NOTE: eval mode changes the result a lot. (maybe due to the batchnorm)
     model.train(True)
 
@@ -74,12 +78,12 @@ def main(args: argparse.Namespace) -> None:
     if not args.by_patches:
         reconstructed_image = reconstruct_image(result_patches)
         if args.colored: reconstructed_image = plt.get_cmap('viridis')(reconstructed_image)[:, :, :3]
-        Image.fromarray((reconstructed_image * 255).astype(np.uint8)).save(f"{args.target_dir}/change_detection.png")      
+        Image.fromarray((reconstructed_image * 255).astype(np.uint8)).save(f"{CURRENT_DIR}/{args.target_dir}/change_detection.png")      
 
     else:
         for i, result_patch in enumerate(result_patches):
             if args.colored: result_patch = plt.get_cmap('viridis')(result_patch)[:, :, :3]
-            Image.fromarray((result_patch * 255).astype(np.uint8)).save(f"{args.target_dir}/{i}.png")      
+            Image.fromarray((result_patch * 255).astype(np.uint8)).save(f"{CURRENT_DIR}/{args.target_dir}/{i}.png")      
 
 
 if __name__ == "__main__":
